@@ -10,6 +10,7 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        multiDexEnabled true
     }
     buildTypes {
         release {
@@ -43,4 +44,6 @@ dependencies {
     implementation 'in.srain.cube:ultra-ptr:1.0.11'
     // picasso
     implementation 'com.squareup.picasso:picasso:2.71828'
+    // oksocket
+    implementation 'com.tonystark.android:socket:2.0.3'
 }
