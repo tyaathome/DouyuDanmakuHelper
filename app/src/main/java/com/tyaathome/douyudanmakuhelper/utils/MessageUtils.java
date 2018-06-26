@@ -9,7 +9,7 @@ public class MessageUtils {
 
     private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
 
-    public static String receive(byte[] bytes) {
+    public static MessageBean receive(byte[] bytes) {
         String str = new String(bytes);
         // Copy from stackoverflow
         String message = bytesToHex(bytes);
@@ -35,7 +35,7 @@ public class MessageUtils {
             String decodedText = decodeMessage(text);
             String result = decodedNickname + ": " + decodedText;
             System.out.println(result);
-            return result;
+            return new MessageBean(messageType, result);
         }
         return null;
     }
@@ -106,6 +106,21 @@ public class MessageUtils {
 
     private static int calcMessageLength(String content) throws UnsupportedEncodingException {
         return 4 + 4 + (content == null ? 0 : content.getBytes("UTF-8").length) + 1;
+    }
+
+    public static class MessageBean {
+        public String type = "";
+        public String message = "";
+
+        public MessageBean() {
+            this.type = "";
+            this.message = "";
+        }
+
+        public MessageBean(String type, String message) {
+            this.message = message;
+            this.type = type;
+        }
     }
 
 }

@@ -14,9 +14,6 @@ import com.tyaathome.douyudanmakuhelper.utils.manager.LayoutID;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-import io.reactivex.Observable;
 
 @LayoutID(R.layout.activity_danmaku)
 public class DanmakuActivity extends BaseActivity {
@@ -37,18 +34,32 @@ public class DanmakuActivity extends BaseActivity {
 
     private void getRoomDetail() {
         String id = getIntent().getStringExtra(BundleConstant.ROOM_ID);
-        if(!TextUtils.isEmpty(id)) {
+        if (!TextUtils.isEmpty(id)) {
             AppService.getInstance().getRoomDetail(id, danmakuBean -> {
-                if(danmakuBean != null) {
+                if (danmakuBean != null) {
                     SocketService.getInstance().connect(connectionInfo -> {
-                        SocketService.getInstance().send("type@=loginreq/roomid@=" + id + "/");
-                        SocketService.getInstance().send("type@=joingroup/rid@=" + id + "/gid@=-9999/");
-                        Observable.timer(45, TimeUnit.SECONDS).subscribe(aLong -> SocketService.getInstance().send("type@=mrkl/"));
+                        SocketService.getInstance().send(connectionInfo, "type@=loginreq/roomid@=" + id + "/");
+                        SocketService.getInstance().send(connectionInfo, "type@=joingroup/rid@=" + id + "/gid@=-9999/");
+                        SocketService.getInstance().send(connectionInfo, "type@=mrkl/");
+//                        Observable.timer(45, TimeUnit.SECONDS).subscribe(aLong -> SocketService.getInstance().send
+//                                ("type@=mrkl/"));
 
-                    }, s -> {
-                        if (!TextUtils.isEmpty(s)) {
-                            runOnUiThread(() -> adapter.addMessage(s));
-
+                    }, bean -> {
+                        if (bean != null) {
+                            //runOnUiThread(() -> adapter.addMessage(s));
+                                switch (bean.type) {
+                                    case "loginres":
+//                                        Observable.timer(10, TimeUnit.SECONDS).subscribe(aLong -> SocketService.getInstance().send
+//                                                ("type@=logout/"));
+                                        break;
+                                    case "error":
+                                        //SocketService.getInstance().disconnect();
+                                        break;
+                                    case "chatmsg":
+                                        String name = Thread.currentThread().getName();
+                                        adapter.addMessage(bean.message);
+                                        break;
+                                }
                         }
                     });
                 }
@@ -67,7 +78,14 @@ public class DanmakuActivity extends BaseActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        SocketService.getInstance().send("type@=logout/");
+        //SocketService.getInstance().send("type@=logout/");
         //SocketService.getInstance().disconnect();
+    }
+
+    @Override
+    public void onBackPressed() {
+        SocketService.getInstance().send("type@=logout/");
+        SocketService.getInstance().disconnect();
+        super.onBackPressed();
     }
 }

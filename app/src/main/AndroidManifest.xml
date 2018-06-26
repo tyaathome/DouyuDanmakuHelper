@@ -27,7 +27,8 @@
             android:name=".ui.activity.RoomActivity"
             android:screenOrientation="portrait">
         </activity>
-        <activity android:name=".ui.activity.DanmakuActivity">
+        <activity android:name=".ui.activity.DanmakuActivity"
+            android:launchMode="singleTask">
         </activity>
     </application>
 

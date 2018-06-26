@@ -1,6 +1,7 @@
 package com.tyaathome.douyudanmakuhelper.net.tcp;
 
 import android.content.Context;
+import android.util.Log;
 
 import com.tyaathome.douyudanmakuhelper.impl.OnCall;
 import com.tyaathome.douyudanmakuhelper.utils.MessageUtils;
@@ -11,18 +12,16 @@ import com.xuhao.android.libsocket.sdk.SocketActionAdapter;
 import com.xuhao.android.libsocket.sdk.bean.ISendable;
 import com.xuhao.android.libsocket.sdk.bean.OriginalData;
 import com.xuhao.android.libsocket.sdk.connection.IConnectionManager;
-import com.xuhao.android.libsocket.utils.BytesUtils;
+import com.xuhao.android.libsocket.sdk.connection.interfacies.IAction;
 
-import java.io.UnsupportedEncodingException;
-import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import io.reactivex.Observable;
-import io.reactivex.ObservableSource;
+import io.reactivex.ObservableEmitter;
+import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.Observer;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
-import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
 
 public class SocketService {
@@ -44,43 +43,64 @@ public class SocketService {
         return instance;
     }
 
-    private void create() {
-        connectionManager = OkSocket.open(connectionInfo);
-        OkSocketOptions options = connectionManager.getOption();
+    private IConnectionManager create() {
+        IConnectionManager manager = OkSocket.open(address, port);
+        OkSocketOptions options = manager.getOption();
         OkSocketOptions.Builder builder = new OkSocketOptions.Builder(options);
         builder.setReadByteOrder(ByteOrder.LITTLE_ENDIAN);
-//        builder.setHeaderProtocol(new IHeaderProtocol() {
-//            @Override
-//            public int getHeaderLength() {
-//                return 4;
-//            }
-//
-//            @Override
-//            public int getBodyLength(byte[] header, ByteOrder byteOrder) {
-//                String string = new String(header);
-//                ByteBuffer byteBuffer = ByteBuffer.allocate(4);
-//                byteBuffer.put(header, 0, 4);
-//                byte[] bytes2 = byteBuffer.array();
-//                int a = byteArrayToInt(bytes2);
-//                return a;
-//            }
-//        });
-        connectionManager.option(builder.build());
-
+        manager.option(builder.build());
+        return manager;
     }
 
-    public void connect(OnCall<ConnectionInfo> send, OnCall<String> receive) {
-        Observable.just(1)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribeOn(Schedulers.io())
-                .flatMap((Function<Object, ObservableSource<Integer>>) o -> Observable.create(emitter -> {
-                    String name = Thread.currentThread().getName();
-                    if (connectionManager == null) {
-                        create();
+    public void connect(OnCall<ConnectionInfo> send, OnCall<MessageUtils.MessageBean> receive) {
+        Observable.create(new ObservableOnSubscribe<Object>() {
+            @Override
+            public void subscribe(ObservableEmitter<Object> emitter) throws Exception {
+                String name = Thread.currentThread().getName();
+                connectionManager = create();
+                connectionManager.registerReceiver(new SocketActionAdapter() {
+                    @Override
+                    public void onSocketConnectionSuccess(Context context, ConnectionInfo info, String action) {
+                        super.onSocketConnectionSuccess(context, info, action);
+                        connectionManager = OkSocket.open(info);
+                        if (info != null && connectionManager.isConnect()) {
+                            Object[] params = {action, context, info};
+                            emitter.onNext(params);
+                        }
                     }
-                    emitter.onComplete();
-                }))
 
+                    @Override
+                    public void onSocketConnectionFailed(Context context, ConnectionInfo info, String action,
+                                                         Exception e) {
+                        super.onSocketConnectionFailed(context, info, action, e);
+                        Object[] params = {action, context, info, e};
+                        emitter.onNext(params);
+                    }
+
+                    @Override
+                    public void onSocketReadResponse(Context context, ConnectionInfo info, String action,
+                                                     OriginalData data) {
+                        super.onSocketReadResponse(context, info, action, data);
+                        Object[] params = {action, context, info, data};
+                        emitter.onNext(params);
+                    }
+
+                    @Override
+                    public void onSocketDisconnection(Context context, ConnectionInfo info, String action, Exception
+                            e) {
+                        super.onSocketDisconnection(context, info, action, e);
+                        connectionManager = OkSocket.open(info);
+                        Object[] params = {action, context, info, e};
+                        emitter.onNext(params);
+                        emitter.onComplete();
+                    }
+                });
+                connectionManager.connect();
+                //emitter.onComplete();
+            }
+        })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Observer<Object>() {
                     @Override
                     public void onSubscribe(Disposable d) {
@@ -89,7 +109,54 @@ public class SocketService {
 
                     @Override
                     public void onNext(Object o) {
-
+                        String name = Thread.currentThread().getName();
+                        if (o != null && o instanceof Object[]) {
+                            Object[] params = (Object[]) o;
+                            if (params.length > 0) {
+                                if (params[0] instanceof String) {
+                                    String action = (String) params[0];
+                                    switch (action) {
+                                        case IAction.ACTION_CONNECTION_SUCCESS:
+                                            if(params.length > 2 && params[2] instanceof ConnectionInfo) {
+                                                ConnectionInfo info = (ConnectionInfo) params[2];
+                                                if (send != null) {
+                                                    send.onCall(info);
+                                                }
+                                            }
+                                            break;
+                                        case IAction.ACTION_CONNECTION_FAILED:
+                                            break;
+                                        case IAction.ACTION_READ_COMPLETE:
+                                            if (params.length > 3 && params[3] instanceof OriginalData) {
+                                                OriginalData data = (OriginalData) params[3];
+                                                byte[] result = byteMergerAll(data.getHeadBytes(), data
+                                                        .getBodyBytes());
+                                                MessageUtils.MessageBean info = MessageUtils.receive(result);
+                                                if(info != null) {
+                                                    String message = info.message;
+                                                    Log.e("SocketService", message);
+                                                    if(message.equals("error")) {
+                                                        String str = new String(result);
+                                                        Log.e("SocketService", "error : " + str);
+                                                    }
+                                                    if (receive != null) {
+                                                        receive.onCall(info);
+                                                    }
+                                                }
+                                            }
+                                            break;
+                                        case IAction.ACTION_DISCONNECTION:
+                                            System.out.println("断开连接");
+                                            if (params.length > 2 && params[2] instanceof ConnectionInfo) {
+                                                ConnectionInfo info = (ConnectionInfo) params[2];
+                                                boolean b = OkSocket.open(info).isDisconnecting();
+                                                boolean b1 = OkSocket.open(info).isConnect();
+                                            }
+                                            break;
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     @Override
@@ -99,54 +166,13 @@ public class SocketService {
 
                     @Override
                     public void onComplete() {
-                        String name = Thread.currentThread().getName();
-                        connectionManager.connect();
-                        connectionManager.registerReceiver(new SocketActionAdapter() {
-                            @Override
-                            public void onSocketConnectionSuccess(Context context, ConnectionInfo info, String action) {
-                                super.onSocketConnectionSuccess(context, info, action);
-                                if(send != null) {
-                                    send.onCall(info);
-                                }
-                            }
 
-                            @Override
-                            public void onSocketReadResponse(Context context, ConnectionInfo info, String action, OriginalData data) {
-                                super.onSocketReadResponse(context, info, action, data);
-                                byte[] bytes = data.getHeadBytes();
-                                byte[] bytes1 = data.getBodyBytes();
-                                try {
-                                    String string = new String(bytes, "UTF-8");
-                                    String string1 = new String(bytes1, "UTF-8");
-                                    int length = 0;
-                                    if (ByteOrder.BIG_ENDIAN.toString().equals(ByteOrder.nativeOrder().toString())) {
-                                        length = BytesUtils.bytesToInt2(bytes, 0);
-                                    } else {
-                                        length = BytesUtils.bytesToInt(bytes, 0);
-                                    }
-                                    ByteBuffer byteBuffer = ByteBuffer.allocate(4);
-                                    byteBuffer.put(bytes, 0, 4);
-                                    byte[] bytes2 = byteBuffer.array();
-                                    int a = byteArrayToInt(bytes2);
-
-                                    byte[] result = byteMergerAll(bytes, bytes1);
-                                String message = MessageUtils.receive(result);
-                                System.out.println(message);
-                                if(receive != null) {
-                                    receive.onCall(message);
-                                }
-                                } catch (UnsupportedEncodingException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-                        });
                     }
                 });
-
     }
 
     public void disconnect() {
-        if(connectionManager != null) {
+        if (connectionManager != null) {
             connectionManager.disconnect();
             connectionManager = null;
         }
@@ -156,9 +182,12 @@ public class SocketService {
         OkSocket.open(connectionInfo).send(new SendData(message));
     }
 
-    public int byteArrayToInt(byte[] b)
-    {
-        return   b[0] & 0xFF |
+    public void send(ConnectionInfo connectionInfo, String message) {
+        OkSocket.open(connectionInfo).send(new SendData(message));
+    }
+
+    public int byteArrayToInt(byte[] b) {
+        return b[0] & 0xFF |
                 (b[1] & 0xFF) << 8 |
                 (b[2] & 0xFF) << 16 |
                 (b[3] & 0xFF) << 24;
@@ -183,6 +212,7 @@ public class SocketService {
     private class SendData implements ISendable {
 
         private String message;
+
         public SendData(String message) {
             this.message = message;
         }
