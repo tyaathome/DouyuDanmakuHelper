@@ -22,7 +22,10 @@ public class ClientHandler extends IoHandlerAdapter {
         super.messageReceived(session, message);
         IoBuffer buffer = (IoBuffer) message;
         byte[] bytes = buffer.array();
-        String result = new String(bytes);
+        int messageLength = bytes.length - 8;
+        byte[] messageBytes = new byte[messageLength];
+        System.arraycopy(bytes, 8, messageBytes, 0, messageLength);
+        String result = new String(messageBytes);
         Log.e("ClientHandler", result);
     }
 
@@ -30,4 +33,16 @@ public class ClientHandler extends IoHandlerAdapter {
     public void sessionIdle(IoSession session, IdleStatus status) throws Exception {
         super.sessionIdle(session, status);
     }
+
+    @Override
+    public void exceptionCaught(IoSession session, Throwable cause) throws Exception {
+        super.exceptionCaught(session, cause);
+    }
+
+    @Override
+    public void messageSent(IoSession session, Object message) throws Exception {
+        super.messageSent(session, message);
+    }
+
+
 }

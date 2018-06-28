@@ -1,9 +1,13 @@
 package com.tyaathome.douyudanmakuhelper.net.tcp.mina;
 
+import android.text.TextUtils;
+
 import org.apache.mina.core.future.ConnectFuture;
 import org.apache.mina.core.session.IdleStatus;
 import org.apache.mina.core.session.IoSession;
 import org.apache.mina.filter.codec.ProtocolCodecFilter;
+import org.apache.mina.filter.keepalive.KeepAliveFilter;
+import org.apache.mina.filter.keepalive.KeepAliveRequestTimeoutHandler;
 import org.apache.mina.transport.socket.nio.NioSocketConnector;
 
 import java.net.InetSocketAddress;
@@ -17,6 +21,7 @@ public class MinaService {
     private NioSocketConnector socketConnector;
     private ConnectFuture connectFuture;
     private IoSession session;
+    private String heartBeatMessage;
 
     private static final long TIMEOUT_INTERVAL = 10 * 1000;
     //30秒后超时
@@ -30,7 +35,7 @@ public class MinaService {
         init();
     }
 
-    public void init() {
+    private void init() {
         if(clientHandler == null) {
             clientHandler = new ClientHandler();
         }
@@ -44,6 +49,14 @@ public class MinaService {
         socketConnector.getSessionConfig().setReadBufferSize(1024);
         socketConnector.setConnectTimeoutMillis(10 * 1000);
         socketConnector.getSessionConfig().setIdleTime(IdleStatus.BOTH_IDLE, IDELTIMEOUT);
+        if(!TextUtils.isEmpty(heartBeatMessage)) {
+            KeepAliveFilter heartBeat = new KeepAliveFilter(new KeepAliveMessageFactoryImpl(""),
+                    IdleStatus.BOTH_IDLE, KeepAliveRequestTimeoutHandler.CLOSE, 10, 60);
+            heartBeat.setForwardEvent(true);
+            heartBeat.setRequestInterval(HEARTBEATRATE);
+            socketConnector.getFilterChain().addLast("heartbeat", heartBeat);
+        }
+
         socketConnector.setHandler(clientHandler);
         connectFuture = socketConnector.connect(new InetSocketAddress(SERVICE_ADDRESS, SERVICE_PORT));
         connectFuture.awaitUninterruptibly();
@@ -74,12 +87,12 @@ public class MinaService {
 
     public void send(String message) {
         if(session != null && session.isConnected()) {
-//            byte[] result = MessageUtils.sendMessageContent(message);
-//            IoBuffer buffer = IoBuffer.allocate(result.length);
-//            buffer.put(result);
-//            session.write(buffer);
             session.write(message);
         }
+    }
+
+    public void setHeartBeat(String message) {
+        heartBeatMessage = message;
     }
 
 }

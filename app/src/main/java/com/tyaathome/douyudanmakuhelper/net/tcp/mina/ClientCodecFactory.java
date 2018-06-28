@@ -1,5 +1,7 @@
 package com.tyaathome.douyudanmakuhelper.net.tcp.mina;
 
+import android.util.Log;
+
 import com.tyaathome.douyudanmakuhelper.utils.MessageUtils;
 
 import org.apache.mina.core.buffer.IoBuffer;
@@ -34,18 +36,6 @@ public class ClientCodecFactory implements ProtocolCodecFactory {
 
     @Override
     public ProtocolDecoder getDecoder(IoSession session) throws Exception {
-//        return new ProtocolDecoderAdapter() {
-//            @Override
-//            public void decode(IoSession session, IoBuffer in, ProtocolDecoderOutput out) throws Exception {
-//                byte[] bytes = in.array();
-//                String string = new String(bytes);
-//                int remaining = in.remaining();
-//                if(remaining < 4) {
-//                    return false;
-//                }
-//                System.out.println(string);
-//            }
-//        };
         return new CumulativeProtocolDecoder() {
             @Override
             protected boolean doDecode(IoSession session, IoBuffer in, ProtocolDecoderOutput out) throws Exception {
@@ -59,22 +49,15 @@ public class ClientCodecFactory implements ProtocolCodecFactory {
                 }
                 if(in.remaining() > 1) {
                     in.mark();
-                    int len = in.getInt()+4;
-                    System.out.println(len);
+                    int len = in.getInt();
+                    Log.e("ClientHandler", String.valueOf(len));
                     if(len > in.remaining()) {
                         in.reset();
                         return false;
                     } else {
-                        in.reset();
-//                        int messageLength = len-8;
-//                        byte[] messageBytes = new byte[messageLength];
-//                        System.arraycopy(bytes, 12, messageBytes, 0, messageLength);
-//                        IoBuffer buffer = IoBuffer.wrap(messageBytes);
-//                        out.write(buffer);
-                        int sumLen = len;//总长 = 包头+包体
-                        byte[] packArr = new byte[sumLen];
-                        in.get(packArr, 0, sumLen);
-                        IoBuffer buffer = IoBuffer.allocate(sumLen);
+                        byte[] packArr = new byte[len];
+                        in.get(packArr, 0, len);
+                        IoBuffer buffer = IoBuffer.allocate(len);
                         buffer.put(packArr);
                         buffer.flip();
                         out.write(buffer);
@@ -84,5 +67,13 @@ public class ClientCodecFactory implements ProtocolCodecFactory {
                 return false;
             }
         };
+    }
+
+    public int byteArrayToInt(byte[] b) {
+        return b[0] & 0xFF |
+                (b[1] & 0xFF) << 8 |
+                (b[2] & 0xFF) << 16 |
+                (b[3] & 0xFF) << 24;
+
     }
 }

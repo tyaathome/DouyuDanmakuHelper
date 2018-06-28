@@ -14,7 +14,6 @@ import com.tyaathome.douyudanmakuhelper.utils.manager.LayoutID;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
 import io.reactivex.ObservableEmitter;
@@ -31,6 +30,7 @@ public class DanmakuActivity extends BaseActivity {
     private RecyclerView recyclerView;
     private List<String> messageList = new ArrayList<>();
     private MinaService service = new MinaService();
+    private Disposable heartDisposable;
 
     @Override
     public void initViews(Bundle savedInstanceState) {
@@ -81,10 +81,17 @@ public class DanmakuActivity extends BaseActivity {
                     if(service == null) {
                         service = new MinaService();
                     }
+                    service.setHeartBeat("type@=mrkl/");
                     service.connect();
                     service.send("type@=loginreq/roomid@=" + id + "/");
                     service.send("type@=joingroup/rid@=" + id + "/gid@=-9999/");
-                    Observable.timer(45, TimeUnit.SECONDS).subscribe(aLong -> service.send("type@=mrkl/"));
+                    service.send("type@=mrkl/");
+                    //Observable.timer(45, TimeUnit.SECONDS).subscribe(aLong -> service.send("type@=mrkl/"));
+//                    heartDisposable = Observable.interval(0, 10, TimeUnit.SECONDS)
+//                            .subscribe(aLong -> {
+//                                System.out.println("心跳包发送 : " + aLong);
+//                                service.send("type@=mrkl/");
+//                            });
                 }
             })
                     .subscribeOn(Schedulers.io())
@@ -135,6 +142,10 @@ public class DanmakuActivity extends BaseActivity {
 //        SocketService.getInstance().disconnect();
         if(service != null) {
             service.disconnect();
+        }
+        if(heartDisposable != null && !heartDisposable.isDisposed()) {
+            heartDisposable.dispose();
+            heartDisposable = null;
         }
         super.onBackPressed();
     }
