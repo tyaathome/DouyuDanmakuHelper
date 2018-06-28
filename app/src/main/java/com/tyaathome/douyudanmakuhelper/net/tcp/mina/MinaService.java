@@ -1,16 +1,14 @@
 package com.tyaathome.douyudanmakuhelper.net.tcp.mina;
 
-import android.text.TextUtils;
-
 import org.apache.mina.core.future.ConnectFuture;
 import org.apache.mina.core.session.IdleStatus;
 import org.apache.mina.core.session.IoSession;
 import org.apache.mina.filter.codec.ProtocolCodecFilter;
-import org.apache.mina.filter.keepalive.KeepAliveFilter;
-import org.apache.mina.filter.keepalive.KeepAliveRequestTimeoutHandler;
 import org.apache.mina.transport.socket.nio.NioSocketConnector;
 
 import java.net.InetSocketAddress;
+
+import io.reactivex.ObservableEmitter;
 
 /**
  * Created by tyaathome on 2018/06/27.
@@ -22,6 +20,7 @@ public class MinaService {
     private ConnectFuture connectFuture;
     private IoSession session;
     private String heartBeatMessage;
+    private ObservableEmitter<String> emitter;
 
     private static final long TIMEOUT_INTERVAL = 10 * 1000;
     //30秒后超时
@@ -31,13 +30,14 @@ public class MinaService {
     private static final String SERVICE_ADDRESS = "openbarrage.douyutv.com";
     private static final int SERVICE_PORT = 8601;
 
-    public MinaService() {
+    public MinaService(ObservableEmitter<String> emitter) {
+        this.emitter = emitter;
         init();
     }
 
     private void init() {
         if(clientHandler == null) {
-            clientHandler = new ClientHandler();
+            clientHandler = new ClientHandler(emitter);
         }
         if(socketConnector == null) {
             socketConnector = new NioSocketConnector();
@@ -49,13 +49,13 @@ public class MinaService {
         socketConnector.getSessionConfig().setReadBufferSize(1024);
         socketConnector.setConnectTimeoutMillis(10 * 1000);
         socketConnector.getSessionConfig().setIdleTime(IdleStatus.BOTH_IDLE, IDELTIMEOUT);
-        if(!TextUtils.isEmpty(heartBeatMessage)) {
-            KeepAliveFilter heartBeat = new KeepAliveFilter(new KeepAliveMessageFactoryImpl(""),
-                    IdleStatus.BOTH_IDLE, KeepAliveRequestTimeoutHandler.CLOSE, 10, 60);
-            heartBeat.setForwardEvent(true);
-            heartBeat.setRequestInterval(HEARTBEATRATE);
-            socketConnector.getFilterChain().addLast("heartbeat", heartBeat);
-        }
+//        if(!TextUtils.isEmpty(heartBeatMessage)) {
+//            KeepAliveFilter heartBeat = new KeepAliveFilter(new KeepAliveMessageFactoryImpl(""),
+//                    IdleStatus.BOTH_IDLE, KeepAliveRequestTimeoutHandler.CLOSE, 10, 60);
+//            heartBeat.setForwardEvent(true);
+//            heartBeat.setRequestInterval(HEARTBEATRATE);
+//            socketConnector.getFilterChain().addLast("heartbeat", heartBeat);
+//        }
 
         socketConnector.setHandler(clientHandler);
         connectFuture = socketConnector.connect(new InetSocketAddress(SERVICE_ADDRESS, SERVICE_PORT));

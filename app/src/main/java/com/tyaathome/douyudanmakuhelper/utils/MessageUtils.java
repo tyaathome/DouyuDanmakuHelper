@@ -16,12 +16,12 @@ public class MessageUtils {
         // Get first "/"
         int slashIndex = message.indexOf("2F") / 2;
         String messageType = new String();
-        for (int i = 18; i < slashIndex; i++) {
+        for (int i = 0; i < slashIndex; i++) {
             messageType += (char) bytes[i];
         }
 
         // Determine type of message
-        if (messageType.equals("chatmsg")) {
+        if (messageType.equals("type@=chatmsg")) {
             // "/nn@="
             int nicknameIndex = message.indexOf("2F6E6E403D") / 2;
             // "/txt@="
