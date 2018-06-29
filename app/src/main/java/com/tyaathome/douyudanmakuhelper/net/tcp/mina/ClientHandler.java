@@ -1,9 +1,15 @@
 package com.tyaathome.douyudanmakuhelper.net.tcp.mina;
 
+import android.util.Log;
+
+import com.tyaathome.douyudanmakuhelper.utils.MessageUtils;
+
 import org.apache.mina.core.buffer.IoBuffer;
 import org.apache.mina.core.service.IoHandlerAdapter;
 import org.apache.mina.core.session.IdleStatus;
 import org.apache.mina.core.session.IoSession;
+
+import java.util.Map;
 
 import io.reactivex.ObservableEmitter;
 
@@ -12,9 +18,9 @@ import io.reactivex.ObservableEmitter;
  */
 public class ClientHandler extends IoHandlerAdapter {
 
-    private ObservableEmitter<String> emitter;
+    private ObservableEmitter<Map<String, String>> emitter;
 
-    public ClientHandler(ObservableEmitter<String> emitter) {
+    ClientHandler(ObservableEmitter<Map<String, String>> emitter) {
         this.emitter = emitter;
     }
 
@@ -28,12 +34,14 @@ public class ClientHandler extends IoHandlerAdapter {
         super.messageReceived(session, message);
         IoBuffer buffer = (IoBuffer) message;
         byte[] bytes = buffer.array();
-        int messageLength = bytes.length - 8;
+        // messageLength = 总长度 - 头部8位 - 尾部'\0'一位
+        int messageLength = bytes.length - 8 -1;
         byte[] messageBytes = new byte[messageLength];
         System.arraycopy(bytes, 8, messageBytes, 0, messageLength);
         String result = new String(messageBytes);
+        Log.e("messageReceived", result);
         if(emitter != null && !emitter.isDisposed()) {
-            emitter.onNext(result);
+            emitter.onNext(MessageUtils.receive(result));
         }
     }
 

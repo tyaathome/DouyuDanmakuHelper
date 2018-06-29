@@ -1,9 +1,13 @@
 package com.tyaathome.douyudanmakuhelper.utils;
 
+import android.text.TextUtils;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MessageUtils {
 
@@ -36,6 +40,21 @@ public class MessageUtils {
             String result = decodedNickname + ": " + decodedText;
             System.out.println(result);
             return new MessageBean(messageType, result);
+        }
+        return null;
+    }
+
+    public static Map<String, String> receive(String message) {
+        if(!TextUtils.isEmpty(message)) {
+            Map<String, String> result = new HashMap<>();
+            String[] content = message.split("/");
+            for(String s : content) {
+                String[] kv = s.split("@=");
+                if(kv.length == 2) {
+                    result.put(kv[0], kv[1]);
+                }
+            }
+            return result;
         }
         return null;
     }

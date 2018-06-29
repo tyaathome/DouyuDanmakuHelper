@@ -69,11 +69,4 @@ public class ClientCodecFactory implements ProtocolCodecFactory {
         };
     }
 
-    public int byteArrayToInt(byte[] b) {
-        return b[0] & 0xFF |
-                (b[1] & 0xFF) << 8 |
-                (b[2] & 0xFF) << 16 |
-                (b[3] & 0xFF) << 24;
-
-    }
 }

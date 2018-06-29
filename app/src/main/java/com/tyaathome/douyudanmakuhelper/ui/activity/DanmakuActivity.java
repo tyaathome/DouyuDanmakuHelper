@@ -4,17 +4,16 @@ import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.text.TextUtils;
-import android.util.Log;
 
 import com.tyaathome.douyudanmakuhelper.R;
 import com.tyaathome.douyudanmakuhelper.net.tcp.mina.MinaService;
 import com.tyaathome.douyudanmakuhelper.ui.adapter.DanmakuAdapter;
-import com.tyaathome.douyudanmakuhelper.utils.MessageUtils;
 import com.tyaathome.douyudanmakuhelper.utils.constant.BundleConstant;
 import com.tyaathome.douyudanmakuhelper.utils.manager.LayoutID;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import io.reactivex.Observable;
@@ -40,72 +39,12 @@ public class DanmakuActivity extends BaseActivity {
 
     @Override
     public void initEventAndData(Bundle savedInstanceState) {
-        getRoomDetail();
+
     }
 
     private void getRoomDetail() {
         String id = getIntent().getStringExtra(BundleConstant.ROOM_ID);
-        if (!TextUtils.isEmpty(id)) {
-            Observable.create((ObservableOnSubscribe<String>) emitter -> {
-                if(service == null) {
-                    service = new MinaService(emitter);
-                }
-                //service.setHeartBeat("type@=mrkl/");
-                service.connect();
-                service.send("type@=loginreq/roomid@=" + id + "/");
-                service.send("type@=joingroup/rid@=" + id + "/gid@=-9999/");
-                //service.send("type@=mrkl/");
-                Observable.timer(45, TimeUnit.SECONDS).subscribe(aLong -> service.send("type@=mrkl/"));
-                heartDisposable = Observable.interval(0, 10, TimeUnit.SECONDS)
-                        .subscribe(aLong -> {
-                            System.out.println("心跳包发送 : " + aLong);
-                            service.send("type@=mrkl/");
-                        });
-            })
-                    .subscribeOn(Schedulers.io())
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(new Observer<String>() {
-                        @Override
-                        public void onSubscribe(Disposable d) {
-
-                        }
-
-                        @Override
-                        public void onNext(String s) {
-                            if(!TextUtils.isEmpty(s)) {
-                                Log.e("ClientHandler", s);
-                                MessageUtils.MessageBean bean = MessageUtils.receive(s.getBytes());
-                                if (bean != null) {
-                                    switch (bean.type) {
-                                        case "type@=loginres":
-//                                        Observable.timer(10, TimeUnit.SECONDS).subscribe(aLong -> SocketService
-// .getInstance().send
-//                                                ("type@=logout/"));
-                                            break;
-                                        case "type@=error":
-                                            //SocketService.getInstance().disconnect();
-                                            break;
-                                        case "type@=chatmsg":
-                                            String name = Thread.currentThread().getName();
-                                            adapter.addMessage(bean.message);
-                                            break;
-                                    }
-                                }
-                            }
-                        }
-
-                        @Override
-                        public void onError(Throwable e) {
-
-                        }
-
-                        @Override
-                        public void onComplete() {
-
-                        }
-                    });
-
-        }
+        connect(id);
     }
 
     private void initList() {
@@ -125,23 +64,76 @@ public class DanmakuActivity extends BaseActivity {
     }
 
     @Override
-    protected void onStop() {
-        super.onStop();
-        //SocketService.getInstance().send("type@=logout/");
-        //SocketService.getInstance().disconnect();
+    protected void onResume() {
+        super.onResume();
+        getRoomDetail();
     }
 
     @Override
-    public void onBackPressed() {
-//        SocketService.getInstance().send("type@=logout/");
-//        SocketService.getInstance().disconnect();
-        if(service != null) {
+    protected void onStop() {
+        super.onStop();
+        disconnect();
+    }
+
+    private void connect(String id) {
+        if (!TextUtils.isEmpty(id)) {
+            Observable.create((ObservableOnSubscribe<Map<String, String>>) emitter -> {
+                if (service == null) {
+                    service = new MinaService(emitter);
+                }
+                //service.setHeartBeat("type@=mrkl/");
+                service.connect();
+                service.send("type@=loginreq/roomid@=" + id + "/");
+                service.send("type@=joingroup/rid@=" + id + "/gid@=-9999/");
+                heartDisposable = Observable.interval(0, 45, TimeUnit.SECONDS)
+                        .subscribe(aLong -> {
+                            System.out.println("心跳包发送 : " + aLong);
+                            service.send("type@=mrkl/");
+                        });
+            })
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(new Observer<Map<String, String>>() {
+                        @Override
+                        public void onSubscribe(Disposable d) {
+
+                        }
+
+                        @Override
+                        public void onNext(Map<String, String> map) {
+                            if (map != null) {
+                                String type = map.get("type");
+                                switch (type) {
+                                    case "chatmsg":
+                                        String name = map.get("nn");
+                                        String text = map.get("txt");
+                                        adapter.addMessage(name + ": " + text);
+                                        break;
+                                }
+                            }
+                        }
+
+                        @Override
+                        public void onError(Throwable e) {
+
+                        }
+
+                        @Override
+                        public void onComplete() {
+
+                        }
+                    });
+
+        }
+    }
+
+    private void disconnect() {
+        if (service != null) {
             service.disconnect();
         }
-        if(heartDisposable != null && !heartDisposable.isDisposed()) {
+        if (heartDisposable != null && !heartDisposable.isDisposed()) {
             heartDisposable.dispose();
             heartDisposable = null;
         }
-        super.onBackPressed();
     }
 }

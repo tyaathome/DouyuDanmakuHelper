@@ -7,6 +7,7 @@ import org.apache.mina.filter.codec.ProtocolCodecFilter;
 import org.apache.mina.transport.socket.nio.NioSocketConnector;
 
 import java.net.InetSocketAddress;
+import java.util.Map;
 
 import io.reactivex.ObservableEmitter;
 
@@ -20,7 +21,7 @@ public class MinaService {
     private ConnectFuture connectFuture;
     private IoSession session;
     private String heartBeatMessage;
-    private ObservableEmitter<String> emitter;
+    private ObservableEmitter<Map<String, String>> emitter;
 
     private static final long TIMEOUT_INTERVAL = 10 * 1000;
     //30秒后超时
@@ -30,7 +31,7 @@ public class MinaService {
     private static final String SERVICE_ADDRESS = "openbarrage.douyutv.com";
     private static final int SERVICE_PORT = 8601;
 
-    public MinaService(ObservableEmitter<String> emitter) {
+    public MinaService(ObservableEmitter<Map<String, String>> emitter) {
         this.emitter = emitter;
         init();
     }
